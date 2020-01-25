@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<jms:config name="JMS_Config" doc:name="JMS Config" doc:id="efaff924-9067-47aa-82cc-89b3a91f2602" >
+		<jms:active-mq-connection >
+			<jms:factory-configuration brokerUrl="tcp://localhost:61616" />
+		</jms:active-mq-connection>
+	</jms:config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="88fb52fc-85be-471f-b9b5-b51f793466e6" >
+		<file:connection workingDir="E:\ActiveMQ\Read" />
+	</file:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="255257eb-58d5-45f8-9da3-5dcc99ec78aa" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="activemq1Flow" doc:id="a9e692a0-3017-4215-bb52-60c465afff3f" >
+		<file:listener doc:id="1efa1bc4-fb8f-47ba-b222-65ef0f423192" config-ref="File_Config" outputMimeType="application/csv">
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</file:listener>
+		<set-variable value="#[attributes.fileName]" doc:name="fileName" doc:id="a29f2c1d-e4dc-4fe4-94e7-4c54ad536582" variableName="fileName"/>
+		<ee:transform doc:name="Transform Message" doc:id="84201759-0c21-43aa-852c-c8e5866bb750" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="e8f869a5-1d1a-4419-857f-80662b37c2db" message="#[payload]"/>
+		<jms:publish doc:id="70b7fc0c-80b5-4534-82d1-fe82835d2d62" config-ref="JMS_Config" destination="APP1"/>
+	</flow>
+	<flow name="activemq1Flow1" doc:id="a960397a-25fd-4055-b447-b6e95365474e" >
+		<jms:listener doc:name="Listener" doc:id="52b50a7e-0955-4c3d-a1ed-f2552d6d1493" config-ref="JMS_Config" destination="APP1"/>
+		<ee:transform doc:name="Transform Message" doc:id="35e8f074-8f6d-41ef-88c8-39b15e0a288b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="238c655b-05c6-43f2-98b8-ff6d934f4ce3" message="#[payload]"/>
+		<json:validate-schema doc:name="Validate Json" doc:id="28c2bff1-19a8-4851-a509-632970c0d4e1" schema="Validate.json"/>
+		<ee:transform doc:name="Transform Message" doc:id="6a9c9089-fe6d-44e8-8bd8-d7d980f16615" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload filter ($."Price" == "1200" ) filter ($."Payment_Type"=="Mastercard") map ((item, index) -> {
+   "Transaction_date": item."Transaction_date",
+   "Price": item."Price",
+   "Product": item."Product",
+   "Payment_Type": item."Payment_Type",
+   "Country": item."Country"
+})
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="429d1cb7-a817-4098-8c44-e7636e9c964c" message="#[payload]"/>
+		<scatter-gather doc:name="Scatter-Gather" doc:id="9ba57d28-7bce-4937-90d3-e76a4776aee1" >
+			<route >
+				<ee:transform doc:name="US" doc:id="93f9d907-d2c0-4698-a94a-80c28048d6cc">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload filter($."Country" == "United States")]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="7b25a9cf-8489-4155-94cb-8da8b543a233" message="#[payload]"/>
+			</route>
+			<route >
+				<ee:transform doc:name="CAN" doc:id="4b9015f5-26b3-4c27-866b-6458978ef08a" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload filter($."Country" == "Canada")]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="8ec73939-ff34-4720-8c10-05a4e09b624b" message="#[payload]"/>
+			</route>
+			<route >
+				<ee:transform doc:name="SP" doc:id="ceb3b328-9cce-4fd2-8069-05c8fee195ac" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload filter($."Country" == "Spain")]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="5d6fb4fa-324e-47cb-a5ca-429e2f0fa1a9" message="#[payload]"/>
+			</route>
+		</scatter-gather>
+	</flow>
+</mule>
