@@ -1,0 +1,57 @@
+#%RAML 1.0
+version: v1
+title: EmployeeData
+
+types:
+  ED: !include dataTypes/dataType.raml
+traits:
+  Client Authentication:
+    headers:
+      Client ID: string
+
+      Client Secret: string
+    responses:
+      401:
+        description: Unauthorised
+      500:
+        description: Error
+      503:
+        description: Unreachable  
+
+
+/employee:
+  get:
+    is:
+      - Client Authentication:
+    description: get all records
+    responses:
+      400:
+        body:
+          application/json:
+            example: {
+              "message": "Error retrieving data from the Eployee database."
+            }
+      200:
+        description: Returns data
+        body:
+          application/json:
+            type: ED
+            example: !include examples/exampleS.json
+  /id:
+    get:
+      is:
+        - Client Authentication:
+      description: get record for given id
+      responses:
+        400:
+          body:
+            application/json:
+              example:
+                {
+              "message": "Error retrieving data from the Eployee database."
+            }
+        200:
+          body:
+            application/json:
+              type: ED
+              example: !include examples/example.json             

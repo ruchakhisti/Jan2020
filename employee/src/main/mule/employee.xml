@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<http:listener-config name="L1" doc:name="HTTP Listener config" doc:id="7321a4df-8720-450b-bc5e-bc209348fff7" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<flow name="getALL" doc:id="24868586-adf8-4529-ba10-2563ed3015a2" >
+		<try doc:name="Try" doc:id="bdac087c-b224-4d0c-8874-4d332209de60" >
+			<http:request method="GET" doc:name="Request" doc:id="762b3c13-6981-4be6-855b-837fd2482f74" config-ref="HTTP_Request_configuration" path="/api/v1/employees" />
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="3df34e8b-886a-4138-b684-ea152c80b8d3" type="ANY">
+					<ee:transform doc:name="Transform Message" doc:id="bbce4c9a-7cc8-46fc-a023-d1e5a6c35601" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+error.detailedDescription]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</on-error-continue>
+			</error-handler>
+		</try>
+		<ee:transform doc:name="Transform Message" doc:id="ecdefc34-afcc-4da6-a2c8-2d113c015126" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="a835a8e3-7082-4422-a324-1dd8a00366e3" message="#[payload]"/>
+		<foreach doc:name="For Each" doc:id="b6fd3ceb-7c60-4932-8c99-2b078d6f24fe" collection="#[payload.data]">
+			<try doc:name="Try" doc:id="9a146ce6-f230-4326-a816-289c55785fa9" >
+				<db:insert doc:name="Insert" doc:id="d68b7104-e73a-4c6a-bdcb-225c4473daf0" config-ref="Database_Config">
+						<db:sql>INSERT INTO Employees (id, employee_name, employee_salary, employee_age, profile_image) values(:id, :employee_name, :employee_salary, :employee_age, :profile_image);</db:sql>
+						<db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
+					</db:insert>
+				<error-handler >
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="a3768689-4e1f-4832-85c5-7bc4cbd3dbb4" type="ANY">
+						<ee:transform doc:name="Transform Message" doc:id="26fc707b-e566-49f4-918a-f58034034392" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+error.detailedDescription]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</on-error-continue>
+				</error-handler>
+			</try>
+		</foreach>
+		<try doc:name="Try" doc:id="1c30723f-9285-4edc-ad3e-6bb1e55085cc" >
+			<db:select doc:name="Select" doc:id="c3c7c789-c149-4e91-a491-d3cccaf89779" config-ref="Database_Config">
+					<db:sql>SELECT `employee_name` FROM `Employees`</db:sql>
+					<db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
+				</db:select>
+			<ee:transform doc:name="Transform Message" doc:id="62db0e00-3333-43e4-8182-3004f51aeff7">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			<os:store doc:id="926dd57b-85e6-4262-8c7e-8c31d1dd926d" key='#["employee_name"]'>
+				<os:value><![CDATA[#[payload."employee_name"]]]></os:value>
+			</os:store>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="ce260fa8-3ee4-463a-b940-a7c6190f77ca" type="ANY">
+					<ee:transform doc:name="Transform Message" doc:id="0213958a-f749-46e1-b047-785d6b9fca2e" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+error.detailedDescription]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</on-error-continue>
+			</error-handler>
+		</try>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="23bc2372-ba0d-4711-aa54-0dc8d4f05623" type="ANY">
+				<ee:transform doc:name="Transform Message" doc:id="3f4b4a39-7478-4ca7-9def-a76cd80b74b8" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+error.detailedDescription]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="SendEmail" doc:id="e5c0e4a9-b7e8-4fbb-b4c8-451b96726416" >
+		<http:listener doc:name="Listener" doc:id="cfe38c8a-5a26-4557-a0ab-598c56382792" config-ref="L1" path="/email"/>
+		<db:select doc:name="Select" doc:id="02ca9422-bc05-4daf-a561-258b9a47bbea" config-ref="Database_Config">
+			<db:sql >SELECT * FROM `Employees`</db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="9ea3cc4c-4229-4c82-b66f-171f64dd69b6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<email:send doc:name="Send" doc:id="2844f596-ba03-4445-8675-61563101b5d9" config-ref="Email_SMTP" subject="Employee Data">
+			<email:to-addresses >
+				<email:to-address value="rucha.khisti@apisero.com" />
+			</email:to-addresses>
+			<email:body contentType="text/plain" >
+				<email:content ><![CDATA[Hello,
+
+This is the employee data.]]></email:content>
+			</email:body>
+			<email:attachments ><![CDATA[#[%dw 2.0
+output multipart/form-data
+---
+{
+      headers : {
+        "Content-Disposition" : {
+            "filename": "EmployeeData.csv"
+        },
+        "Content-Type" : "application/csv"
+      },
+      content : payload
+    }]]]></email:attachments>
+		</email:send>
+	</flow>
+	<flow name="getByID" doc:id="fddd6604-7de3-4f8c-8ca0-ec44032ec5db" >
+		<set-variable value="#[attributes.uriParams]" doc:name="id" doc:id="18e4347c-a922-4a47-a71a-51e469664ff4" variableName="id"/>
+		<http:request method="GET" doc:name="Request" doc:id="51c69ca0-83d1-4544-aaf7-8cbe96caebb8" config-ref="HTTP_Request_configuration" path="/api/v1/employee">
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"id" : vars.id
+}]]]></http:uri-params>
+		</http:request>
+	</flow>
+</mule>

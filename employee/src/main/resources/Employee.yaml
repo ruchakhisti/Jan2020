@@ -1,0 +1,8 @@
+request:
+ host: "dummy.restapiexample.com"
+
+ 
+db:
+ host: "db4free.net"
+ port: "3306"
+ database: "bookspractise"
