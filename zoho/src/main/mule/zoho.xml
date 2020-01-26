@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="a4165a1f-e273-4c65-83cd-13e0168a820b" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="6916b827-fafc-4052-8c2d-0e5b80222f7b" file="zoho.yaml" />
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="25731805-bb1e-4898-bf69-e42f6ef1c089" >
+		<http:request-connection host="${request.host}" protocol="HTTPS"/>
+	</http:request-config>
+	<http:request-config name="RequestMeetingKey" doc:name="HTTP Request configuration" doc:id="16acc1fe-77cc-4e24-9b2c-bc4e3f712450" >
+		<http:request-connection protocol="HTTPS" host="${reqMeetKey.host}"/>
+	</http:request-config>
+	<http:request-config name="Invite" doc:name="HTTP Request configuration" doc:id="c4217fb5-4d7e-491e-8cbe-e66e0d4426fd" >
+		<http:request-connection host="${invite.host}" protocol="HTTPS"/>
+	</http:request-config>
+	<flow name="getAuthToken" doc:id="3ebf2139-edb0-4eb7-9037-d96b576091a2" >
+		<http:listener doc:name="Listener" doc:id="e463a020-5452-4d25-bd1c-5e6f524d5684" config-ref="HTTP_Listener_config" path="/zoho"/>
+		<set-variable value="#[attributes.queryParams.SCOPE]" doc:name="SCOPE" doc:id="096c4fff-2dde-4f98-b8ae-34f60860f396" variableName="SCOPE"/>
+		<set-variable value="#[attributes.queryParams.EMAIL_ID]" doc:name="EMAIL_ID" doc:id="1494f21b-4add-4f46-9f8d-b400ad856cfd" variableName="EMAIL_ID"/>
+		<set-variable value="#[attributes.queryParams.PASSWORD]" doc:name="PASSWORD" doc:id="4367198b-e166-4af1-a205-4283993d6a61" variableName="PASSWORD"/>
+		<http:request method="POST" doc:name="Request" doc:id="117ce7ad-c76b-4f8e-bdc1-e5ab537961db" config-ref="HTTP_Request_configuration" path="${request.path}">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"SCOPE" : vars.SCOPE,
+	"EMAIL_ID" :  vars.EMAIL_ID,
+	"PASSWORD": vars.PASSWORD
+}]]]></http:query-params>
+		</http:request>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="9a30f5e6-8890-4383-8e32-7455cba655c8" />
+	</flow>
+	<flow name="meetingKey" doc:id="a63442f7-e906-497a-a0eb-1bc6df455084" >
+		<http:listener doc:name="Listener" doc:id="b0248893-1de4-410b-a4cb-c1861a0766f5" config-ref="HTTP_Listener_config" path="/meetingId"/>
+		<set-variable value="#[attributes.queryParams.authtoken]" doc:name="token" doc:id="a92c998c-2825-47fd-a1b9-5e9765584ca7" variableName="token"/>
+		<set-variable value="#[attributes.queryParams.apikey]" doc:name="key" doc:id="8017ed8b-72bd-422c-9f63-9a97c7507bba" variableName="key"/>
+		<set-variable value="#[attributes.queryParams.topic]" doc:name="topic" doc:id="1ef2fb02-56f4-4d5a-96e0-9cbce955bf36" variableName="topic"/>
+		<set-variable value="#[attributes.queryParams.sendMail]" doc:name="sendMail" doc:id="fe477e5b-0b90-4ab3-b04c-193b87fd7444" variableName="sendMail"/>
+		<set-variable value="#[attributes.queryParams.participants]" doc:name="participants" doc:id="d1a61df7-cc23-4af1-ad94-2b01527a7a5e" variableName="participants"/>
+		<try doc:name="Try" doc:id="578aff92-38bd-4873-b8db-47f13035d27e" >
+			<http:request method="POST" doc:name="RequestMeetKey" doc:id="bb8e6588-c7fb-4fc8-b184-7888b910f820" config-ref="RequestMeetingKey" responseTimeout="3000000" target="MeetingKey" path="${reqMeetKey.path}">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"topic" : vars.topic,
+	"apikey" : vars.key,
+	"authtoken" : vars.token
+}]]]></http:query-params>
+		</http:request>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="d5847337-870a-4435-930a-e4e84a5d9dbe" type="ANY">
+					<ee:transform doc:name="Transform Message" doc:id="e81efec2-bfae-48eb-9eee-848ba14a1949" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+error.detailedDescription]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</on-error-continue>
+			</error-handler>
+		</try>
+		<set-payload value="#[vars.MeetingKey]" doc:name="Set Payload" doc:id="29b7e1eb-acff-4cc7-8a98-8e392e58b881" />
+		<logger level="INFO" doc:name="Logger" doc:id="5c89ed6e-54be-458c-a178-bc507f542b3a" message='MeetingKey  #[vars.MeetingKey."response"."result"."meeting"."meetingKey"]'/>
+		<try doc:name="Try" doc:id="30a93e49-0175-4ec1-8834-8112bc9630e6" >
+			<http:request method="PUT" doc:name="Invite" doc:id="dc71979c-f955-47ee-8d51-b2e93be90ddb" config-ref="Invite" path="${invite.path}">
+				<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"meetingKey" : vars.MeetingKey."response"."result"."meeting"."meetingKey",
+	"inviteeMailId" : vars.participants,
+	"sendMail" : vars.sendMail,
+	"apikey" : vars.key,
+	"authtoken" : vars.token
+}]]]></http:query-params>
+			</http:request>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="18e0449f-0e50-4f95-b087-43a7e5bf3888" >
+					<ee:transform doc:name="Transform Message" doc:id="788fcd33-5e70-4401-b8d8-18da934af662" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+error.detailedDescription]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</on-error-continue>
+			</error-handler>
+		</try>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="3bd33735-96ad-4949-a331-21daf476344e" />
+	</flow>
+</mule>

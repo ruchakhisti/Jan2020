@@ -1,0 +1,12 @@
+request:
+ host: "accounts.zoho.com"
+ path: "/apiauthtoken/nb/create"
+
+ 
+reqMeetKey:
+ host: "meeting.zoho.com"
+ path: "/api/private/json/meetings/createMeeting"
+ 
+invite:
+ host: "meeting.zoho.com"
+ path: "/api/private/json/meetings/inviteParticipant"
